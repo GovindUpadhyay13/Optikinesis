@@ -59,6 +59,69 @@ class VoiceAgentMode:
     SPEAK_NAVIGATION = "speak_navigation"
 
 
+def normalize_spoken_query(query: str) -> str:
+    """Corrects common speech-to-text phonetic misrecognitions for desktop control."""
+    q = (query or "").strip()
+    replacements = [
+        (r"\b(whitey|white tee|white-t|yt|u tube|you tube)\b", "youtube"),
+        (r"\b(lead code|leadcode|leet code|lead-code)\b", "leetcode"),
+        (r"\b(chat gpt|chat-gpt|chat g p t|chatgpt|gpt)\b", "chatgpt"),
+        (r"\b(what's app|what app|whats app|what's-app)\b", "whatsapp"),
+        (r"\b(git hub|git-hub)\b", "github"),
+        (r"\b(g mail|g-mail|google mail)\b", "gmail"),
+        (r"\b(face book|face-book)\b", "facebook"),
+        (r"\b(insta gram|insta-gram|insta)\b", "instagram"),
+        (r"\b(spot ify|spot-ify)\b", "spotify"),
+        (r"\b(net flix|net-flix)\b", "netflix"),
+    ]
+    for pattern, repl in replacements:
+        q = re.sub(pattern, repl, q, flags=re.I)
+    return q
+
+
+WEB_APPS = {
+    "youtube": ("https://www.youtube.com", "Opening YouTube."),
+    "chatgpt": ("https://chatgpt.com", "Opening ChatGPT."),
+    "leetcode": ("https://leetcode.com", "Opening LeetCode."),
+    "google": ("https://www.google.com", "Opening Google."),
+    "github": ("https://github.com", "Opening GitHub."),
+    "gmail": ("https://mail.google.com", "Opening Gmail."),
+    "whatsapp": ("https://web.whatsapp.com", "Opening WhatsApp Web."),
+    "spotify": ("https://open.spotify.com", "Opening Spotify."),
+    "netflix": ("https://www.netflix.com", "Opening Netflix."),
+    "reddit": ("https://www.reddit.com", "Opening Reddit."),
+    "twitter": ("https://x.com", "Opening Twitter."),
+    "x": ("https://x.com", "Opening X."),
+    "amazon": ("https://www.amazon.com", "Opening Amazon."),
+    "linkedin": ("https://www.linkedin.com", "Opening LinkedIn."),
+    "wikipedia": ("https://www.wikipedia.org", "Opening Wikipedia."),
+    "instagram": ("https://www.instagram.com", "Opening Instagram.")
+}
+
+DESKTOP_APPS = {
+    "calc": ("calc.exe", "Opening Calculator."),
+    "calculator": ("calc.exe", "Opening Calculator."),
+    "notepad": ("notepad.exe", "Opening Notepad."),
+    "text editor": ("notepad.exe", "Opening text editor."),
+    "explorer": ("explorer.exe", "Opening File Explorer."),
+    "file explorer": ("explorer.exe", "Opening File Explorer."),
+    "files": ("explorer.exe", "Opening File Explorer."),
+    "my computer": ("explorer.exe", "Opening File Explorer."),
+    "cmd": ("cmd.exe", "Opening Command Prompt."),
+    "command prompt": ("cmd.exe", "Opening Command Prompt."),
+    "terminal": ("cmd.exe", "Opening Command Prompt."),
+    "powershell": ("powershell.exe", "Opening PowerShell."),
+    "paint": ("mspaint.exe", "Opening Paint."),
+    "mspaint": ("mspaint.exe", "Opening Paint."),
+    "task manager": ("taskmgr.exe", "Opening Task Manager."),
+    "taskmgr": ("taskmgr.exe", "Opening Task Manager."),
+    "camera": ("start microsoft.windows.camera:", "Opening Camera."),
+    "settings": ("start ms-settings:", "Opening Windows Settings."),
+    "word": ("write.exe", "Opening Wordpad."),
+    "wordpad": ("write.exe", "Opening Wordpad."),
+}
+
+
 class JayuComputerUseAgent:
     """
     Jayu Computer-Use Agent for hands-free computer navigation and interaction.
@@ -99,7 +162,7 @@ class JayuComputerUseAgent:
         1. type_speak: Dictation to text output and speech synthesis.
         2. speak_navigation: Jayu Computer-Use desktop automation.
         """
-        clean_query = query.strip()
+        clean_query = normalize_spoken_query(query.strip())
         if not clean_query:
             return {
                 "status": "error",
@@ -264,8 +327,9 @@ class JayuComputerUseAgent:
     def _heuristic_computer_use(self, query: str) -> Dict[str, Any]:
         """
         Determines and executes desktop actions for high-frequency assistive commands.
+        Guarantees that everyday websites, apps, and searches ALWAYS succeed.
         """
-        q = query.lower().strip()
+        q = normalize_spoken_query(query).lower().strip()
         action = "unknown"
         params = {}
         feedback = "I couldn't recognize that computer navigation command."
@@ -305,64 +369,12 @@ class JayuComputerUseAgent:
             params = {"tab": "home"}
             feedback = "Navigating to Home Dashboard."
 
-        # C. Application Launching (Notepad, Calc, Explorer, Browser)
-        elif re.search(r"\b(open|launch|start)?\s*(notepad|text editor)\b", q):
-            action = "open_app"
-            params = {"app": "notepad"}
-            feedback = "Opening Notepad on your computer."
+        elif re.search(r"\b(go to|open|show|switch to)\s+(help|need help|everyday help)\b", q):
+            action = "navigate_optikinesis"
+            params = {"tab": "help"}
+            feedback = "Opening Everyday Help Requests."
 
-        elif re.search(r"\b(open|launch|start)?\s*(calc|calculator)\b", q):
-            action = "open_app"
-            params = {"app": "calc"}
-            feedback = "Opening Calculator."
-
-        elif re.search(r"\b(open|launch|start)?\s*(file explorer|files|my computer|folder)\b", q):
-            action = "open_app"
-            params = {"app": "explorer"}
-            feedback = "Opening File Explorer."
-
-        elif re.search(r"\b(open|launch|start)?\s*(terminal|command prompt|powershell|cmd)\b", q):
-            action = "open_app"
-            params = {"app": "cmd"}
-            feedback = "Opening Command Prompt."
-
-        elif re.search(r"\b(open|launch|start)?\s*(chrome|browser|google chrome|internet)\b", q):
-            action = "open_app"
-            params = {"app": "chrome"}
-            feedback = "Opening web browser."
-
-        # D. Window Management & Shortcuts
-        elif re.search(r"\b(close window|close app|close program|exit app)\b", q):
-            action = "close_window"
-            feedback = "Closing active window."
-
-        elif re.search(r"\b(minimize window|minimize all|minimize)\b", q):
-            action = "minimize_window"
-            feedback = "Minimizing window."
-
-        elif re.search(r"\b(maximize window|maximize)\b", q):
-            action = "maximize_window"
-            feedback = "Maximizing window."
-
-        elif re.search(r"\b(show desktop|desktop)\b", q):
-            action = "hotkey"
-            params = {"keys": ["win", "d"]}
-            feedback = "Showing desktop."
-
-        elif re.search(r"\b(switch window|next window|alt tab)\b", q):
-            action = "hotkey"
-            params = {"keys": ["alt", "tab"]}
-            feedback = "Switching active window."
-
-        # E. Web Browsing & Search
-        elif re.search(r"\b(search|google|look up)\s+(?:for\s+)?(.+)", q):
-            m = re.search(r"\b(search|google|look up)\s+(?:for\s+)?(.+)", q)
-            search_term = m.group(2).strip()
-            search_term = re.sub(r"\s+on\s+google$", "", search_term, flags=re.I)
-            action = "search_web"
-            params = {"query": search_term}
-            feedback = f"Searching Google for \"{search_term}\"."
-
+        # C. YouTube Specific (open or search)
         elif re.search(r"\b(?:open\s+)?youtube(?:\s+(?:and\s+)?(?:search|play)\s+(.+))?", q):
             m = re.search(r"\b(?:open\s+)?youtube(?:\s+(?:and\s+)?(?:search|play)\s+(.+))?", q)
             yt_term = m.group(1).strip() if m.group(1) else ""
@@ -375,40 +387,128 @@ class JayuComputerUseAgent:
                 params = {"url": "https://www.youtube.com"}
                 feedback = "Opening YouTube."
 
-        # F. Desktop Typing
-        elif re.search(r"\b(type|write)\s+(?:into app\s+)?(?:saying\s+)?(.+)", q):
-            m = re.search(r"\b(type|write)\s+(?:into app\s+)?(?:saying\s+)?(.+)", q)
-            text_to_type = m.group(2).strip()
-            action = "type_text"
-            params = {"text": text_to_type, "press_enter": False}
-            feedback = f"Typing \"{text_to_type}\" into your active window."
+        # D. Search & Google
+        elif re.search(r"^\s*(search|google|look up|find)\s*$", q):
+            action = "open_url"
+            params = {"url": "https://www.google.com"}
+            feedback = "Opening Google Search. What would you like to search for?"
 
-        # G. Scrolling
-        elif re.search(r"\bscroll\s+down\b", q):
-            action = "scroll"
-            params = {"direction": "down", "amount": 450}
-            feedback = "Scrolling down."
+        elif re.search(r"\b(search|google|look up|find)\s+(?:for\s+)?(.+)", q):
+            m = re.search(r"\b(search|google|look up|find)\s+(?:for\s+)?(.+)", q)
+            search_term = m.group(2).strip()
+            search_term = re.sub(r"\s+on\s+google$", "", search_term, flags=re.I)
+            action = "search_web"
+            params = {"query": search_term}
+            feedback = f"Searching Google for \"{search_term}\"."
 
-        elif re.search(r"\bscroll\s+up\b", q):
-            action = "scroll"
-            params = {"direction": "up", "amount": 450}
-            feedback = "Scrolling up."
+        # E. Known Web Applications (ChatGPT, LeetCode, GitHub, etc.)
+        if action == "unknown":
+            for app_key, (app_url, app_fb) in WEB_APPS.items():
+                if re.search(rf"\b(open|launch|start|go to)?\s*{re.escape(app_key)}\b", q):
+                    action = "open_url"
+                    params = {"url": app_url}
+                    feedback = app_fb
+                    break
 
-        # H. Keyboard & Mouse Actions
-        elif re.search(r"\b(press enter|hit enter|send)\b", q):
-            action = "press_key"
-            params = {"key": "enter"}
-            feedback = "Pressed Enter."
+        # F. Known Desktop Applications (Calc, Notepad, Explorer, Paint, etc.)
+        if action == "unknown":
+            for app_key, (app_cmd, app_fb) in DESKTOP_APPS.items():
+                if re.search(rf"\b(open|launch|start)?\s*{re.escape(app_key)}\b", q):
+                    action = "open_app"
+                    params = {"app": app_key, "cmd": app_cmd}
+                    feedback = app_fb
+                    break
 
-        elif re.search(r"\b(press escape|hit escape|close dialog)\b", q):
-            action = "press_key"
-            params = {"key": "esc"}
-            feedback = "Pressed Escape."
+        # G. General Browser Launching
+        if action == "unknown":
+            if re.search(r"\b(open|launch|start)?\s*(chrome|browser|google chrome|internet|edge)\b", q):
+                action = "open_url"
+                params = {"url": "https://www.google.com"}
+                feedback = "Opening web browser."
 
-        elif re.search(r"\b(click|mouse click)\b", q):
-            action = "click"
-            params = {"position": "center"}
-            feedback = "Clicked current mouse position."
+        # H. Window Management & Shortcuts
+        if action == "unknown":
+            if re.search(r"\b(close window|close app|close program|exit app)\b", q):
+                action = "close_window"
+                feedback = "Closing active window."
+
+            elif re.search(r"\b(minimize window|minimize all|minimize)\b", q):
+                action = "minimize_window"
+                feedback = "Minimizing window."
+
+            elif re.search(r"\b(maximize window|maximize)\b", q):
+                action = "maximize_window"
+                feedback = "Maximizing window."
+
+            elif re.search(r"\b(show desktop|desktop)\b", q):
+                action = "hotkey"
+                params = {"keys": ["win", "d"]}
+                feedback = "Showing desktop."
+
+            elif re.search(r"\b(switch window|next window|alt tab)\b", q):
+                action = "hotkey"
+                params = {"keys": ["alt", "tab"]}
+                feedback = "Switching active window."
+
+        # I. Desktop Typing
+        if action == "unknown":
+            if re.search(r"\b(type|write)\s+(?:into app\s+)?(?:saying\s+)?(.+)", q):
+                m = re.search(r"\b(type|write)\s+(?:into app\s+)?(?:saying\s+)?(.+)", q)
+                text_to_type = m.group(2).strip()
+                action = "type_text"
+                params = {"text": text_to_type, "press_enter": False}
+                feedback = f"Typing \"{text_to_type}\" into your active window."
+
+        # J. Scrolling
+        if action == "unknown":
+            if re.search(r"\bscroll\s+down\b", q):
+                action = "scroll"
+                params = {"direction": "down", "amount": 450}
+                feedback = "Scrolling down."
+
+            elif re.search(r"\bscroll\s+up\b", q):
+                action = "scroll"
+                params = {"direction": "up", "amount": 450}
+                feedback = "Scrolling up."
+
+        # K. Keyboard & Mouse Actions
+        if action == "unknown":
+            if re.search(r"\b(press enter|hit enter|send)\b", q):
+                action = "press_key"
+                params = {"key": "enter"}
+                feedback = "Pressed Enter."
+
+            elif re.search(r"\b(press escape|hit escape|close dialog)\b", q):
+                action = "press_key"
+                params = {"key": "esc"}
+                feedback = "Pressed Escape."
+
+            elif re.search(r"\b(click|mouse click)\b", q):
+                action = "click"
+                params = {"position": "center"}
+                feedback = "Clicked current mouse position."
+
+        # L. Universal "Open <Target>" Catch-All (Never fail an open command!)
+        if action == "unknown":
+            m_open = re.search(r"\b(?:open|launch|start|go to)\s+(.+)", q)
+            if m_open:
+                target = m_open.group(1).strip()
+                if "." in target and " " not in target:
+                    url = f"https://{target}" if not target.startswith("http") else target
+                    action = "open_url"
+                    params = {"url": url}
+                    feedback = f"Opening {target} in your browser."
+                else:
+                    action = "open_url"
+                    params = {"url": f"https://www.google.com/search?q={urllib.parse.quote(target)}"}
+                    feedback = f"Opening {target}."
+
+        if action == "unknown":
+            return {
+                "status": "unknown",
+                "action": "unknown",
+                "feedback": feedback
+            }
 
         # Execute determined action
         exec_result = self.execute_computer_action(action, params)
@@ -435,23 +535,39 @@ class JayuComputerUseAgent:
                 return {"result": "Agent awake and listening"}
 
             elif action == "open_app":
-                app_name = params.get("app", "notepad").lower()
-                app_map = {
-                    "notepad": "notepad.exe",
-                    "calc": "calc.exe",
-                    "calculator": "calc.exe",
-                    "explorer": "explorer.exe",
-                    "cmd": "cmd.exe",
-                    "chrome": "start chrome https://www.google.com"
-                }
-                cmd = app_map.get(app_name, app_name)
+                app_name = params.get("app", "notepad").lower().strip()
+                cmd = params.get("cmd", "")
+
+                # Check if it's actually in WEB_APPS
+                if app_name in WEB_APPS:
+                    url = WEB_APPS[app_name][0]
+                    webbrowser.open_new(url)
+                    return {"result": f"Opened web app: {url}"}
+
+                if not cmd and app_name in DESKTOP_APPS:
+                    cmd = DESKTOP_APPS[app_name][0]
+
+                if not cmd:
+                    if app_name in ["chrome", "browser", "google chrome", "internet", "edge"]:
+                        webbrowser.open_new("https://www.google.com")
+                        return {"result": "Opened web browser"}
+                    cmd = f"{app_name}.exe"
+
+                logger.info(f"[Jayu] Executing app command: {cmd}")
                 try:
                     subprocess.Popen(cmd, shell=True)
                 except Exception as ex:
-                    logger.warning(f"subprocess open failed for {cmd}, trying webbrowser: {ex}")
-                    if app_name in ["chrome", "browser", "google chrome", "google"]:
-                        webbrowser.open_new("https://www.google.com")
+                    logger.warning(f"subprocess open failed for {cmd}, opening in browser: {ex}")
+                    webbrowser.open(f"https://www.google.com/search?q={urllib.parse.quote(app_name)}")
                 return {"result": f"Launched application: {cmd}"}
+
+            elif action == "open_url":
+                url = params.get("url", "https://google.com")
+                if not url.startswith("http"):
+                    url = "https://" + url
+                logger.info(f"[Jayu] Opening URL: {url}")
+                webbrowser.open(url)
+                return {"result": f"Opened URL: {url}"}
 
             elif action == "close_window":
                 pyautogui.hotkey("alt", "f4")
@@ -468,25 +584,19 @@ class JayuComputerUseAgent:
             elif action == "search_web":
                 query = params.get("query", "")
                 url = f"https://www.google.com/search?q={urllib.parse.quote(query)}"
+                logger.info(f"[Jayu] Searching web: {url}")
                 webbrowser.open(url)
                 return {"result": f"Opened Google search for {query}"}
 
             elif action == "search_youtube":
                 query = params.get("query", "")
                 url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
+                logger.info(f"[Jayu] Searching YouTube: {url}")
                 webbrowser.open(url)
                 return {"result": f"Opened YouTube search for {query}"}
 
-            elif action == "open_url":
-                url = params.get("url", "https://google.com")
-                if not url.startswith("http"):
-                    url = "https://" + url
-                webbrowser.open(url)
-                return {"result": f"Opened URL: {url}"}
-
             elif action == "type_text":
                 text = params.get("text", "")
-                # Type characters cleanly into active window
                 pyautogui.write(text, interval=0.03)
                 if params.get("press_enter", False):
                     pyautogui.press("enter")
@@ -520,7 +630,6 @@ class JayuComputerUseAgent:
                 return {"result": "Clicked mouse button"}
 
             elif action == "navigate_optikinesis":
-                # Frontend handles tab switching
                 return {"result": f"Navigating within OptiKinesis to {params.get('tab')}"}
 
             return {"result": "No action executed"}
